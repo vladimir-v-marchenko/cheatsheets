@@ -1,0 +1,80 @@
+---
+tags: [ wifi, router, linux, NAT, iptables, hostapd ]
+---
+
+# Install hostapd:
+apk add hostapd
+
+# /etc/hostapd/hostapd.conf:
+
+ interface=wlan0
+ driver=nl80211
+ ssid=myhotspot
+ hw_mode=g
+ channel=6
+ macaddr_acl=0
+ auth_algs=1
+ ignore_broadcast_ssid=0
+ wpa=3
+ wpa_passphrase=KeePGuessinG
+ wpa_key_mgmt=WPA-PSK
+ wpa_pairwise=TKIP
+ rsn_pairwise=CCMP
+
+
+# Install dnsmasq:
+ apk add dnsmasq
+
+# uncomment 2 lines in /etc/dnsmasq.conf:
+ # Interface to bind to
+ interface=wlan0
+ # Specify starting_range,end_range,lease_time
+ dhcp-range=10.0.0.3,10.0.0.20,12h
+
+
+# Setup the interface and up:
+ ip link set wlp5s0 down
+ ip addr flush dev wlp5s0
+ ip link set wlp5s0 up
+ ip addr add 10.0.0.1/24 dev wlan0
+ start hostapd
+ sudo killall dnsmasq; dnsmasq
+ sudo hostapd
+
+
+
+# bash script:
+
+#!/bin/bash
+# Usage: ./initSoftAP
+########### Initial wifi interface configuration #############
+LAN="${1:-wlan0}"
+WAN="${2:-eth0}"
+ip link set ${LAN} down
+ip addr flush dev ${LAN}
+ip link set ${LAN} up
+ip addr add 10.0.0.1/24 dev ${LAN}
+ 
+# If you still use ifconfig for some reason, replace the above lines with the following
+# ifconfig ${LAN} up 10.0.0.1 netmask 255.255.255.0
+sleep 2
+###########
+ 
+########### Start dnsmasq ##########
+if [ -z "$(ps -e | grep dnsmasq)" ]
+then
+ dnsmasq
+fi
+###########
+########### Enable NAT ############
+iptables -t nat -A POSTROUTING -o ${WAN} -j MASQUERADE
+iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -i ${LAN} -o ${WAN} -j ACCEPT
+ 
+# Uncomment the line below if facing problems while sharing PPPoE
+#iptables -I FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+ 
+sysctl -w net.ipv4.ip_forward=1
+###########
+########## Start hostapd ###########
+hostapd -B /etc/hostapd/hostapd.conf
