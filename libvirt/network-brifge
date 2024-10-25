@@ -1,0 +1,40 @@
+---
+ tags: [ libvirt ]
+---
+# For RedHat based distro:
+```
+ sudo dnf install network-scripts
+```
+
+# Show all networks/interfaces
+```
+ sudo virsh net-list --all
+```
+Output:
+```
+burzum@fedora:~$ sudo virsh net-list --all
+ Name      State    Autostart   Persistent
+--------------------------------------------
+ default   active   yes         yes
+```
+
+# Create libvirt network config
+bridged-network.xml :
+```
+<network>
+    <name>bridged-network</name>
+    <forward mode="bridge" />
+    <bridge name="br0" />
+</network>
+```
+
+# Define new network:
+```
+sudo virsh net-define bridged-network.xml
+```
+# To activate the new network and autostartn:
+```
+sudo virsh net-start bridged-network
+sudo virsh net-autostart bridged-network
+```
+
